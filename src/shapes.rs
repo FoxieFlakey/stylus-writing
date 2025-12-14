@@ -58,6 +58,22 @@ impl Rect {
   }
 }
 
+impl Into<sdl3::rect::Rect> for Rect {
+  fn into(self) -> sdl3::rect::Rect {
+    let x1 = f32::min(self.x1, self.x2);
+    let y1 = f32::min(self.y1, self.y2);
+    let x2 = f32::max(self.x1, self.x2);
+    let y2 = f32::max(self.y1, self.y2);
+    
+    sdl3::rect::Rect::new(
+      x1 as i32,
+      y1 as i32,
+      (x2 - x1) as u32,
+      (y2 - y1) as u32
+    )
+  }
+}
+
 impl Into<FRect> for Rect {
   fn into(self) -> FRect {
     let x1 = f32::min(self.x1, self.x2);

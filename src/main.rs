@@ -1,18 +1,20 @@
 #![feature(thread_sleep_until)]
 
-use std::{cell::RefCell, io::stdout, rc::Rc, time::Duration};
+use std::{cell::RefCell, io::stdout, rc::Rc, sync::{Arc, Condvar, Mutex, atomic::Ordering}, thread, time::Duration};
 
 use log::LevelFilter;
 use sdl3::{event::Event, keyboard::Keycode, pixels::Color};
 
-use crate::{button::Button, shapes::Rect, timer::Timer, writing_canvas::WritingCanvas};
+use crate::{button::Button, pixel_buffer::PixelBuffer, shapes::Rect, timer::Timer, writing_canvas::WritingCanvas};
 
 mod timer;
 mod shapes;
 mod global;
 mod sdl_log;
 mod writing_canvas;
+mod processing_thread;
 mod button;
+mod pixel_buffer;
 
 fn init_sdl() -> Result<(), ()> {
   global::SDL.set(Some(
@@ -41,6 +43,23 @@ fn init_sdl() -> Result<(), ()> {
   Ok(())
 }
 
+// .0 => the pixel buffer
+// .1 => number of updates to the writing canvas
+static CURRENT_PIXELS: Mutex<(Option<Arc<PixelBuffer>>, u64)> = Mutex::new((None, 0));
+static CURRENT_PIXELS_COND: Condvar = Condvar::new();
+
+// .0 => the pixel buffer
+// .1 => number of updates or "generation id" of current buffer to track new changes
+pub fn get_pixels() -> Option<(Arc<PixelBuffer>, u64)> {
+  let current = CURRENT_PIXELS.lock().unwrap();
+  let Some(buf) = current.0.clone() else {
+    // Buffer is not ready yet
+    return None;
+  };
+  
+  Some((buf, current.1))
+}
+
 fn main() -> Result<(), ()> {
   simple_logging::log_to(stdout(), LevelFilter::max());
   sdl_log::init();
@@ -65,7 +84,6 @@ fn main() -> Result<(), ()> {
   
   let canvas = Rc::new(RefCell::new(canvas));
   let mut timer = Timer::new(Duration::from_millis(1000 / 60));
-  let mut one_sec_timer = Timer::new(Duration::from_secs(1));
   
   let mut clear_button = Button::new(Rect {
     x1: (WIDTH - 100) as f32,
@@ -81,7 +99,10 @@ fn main() -> Result<(), ()> {
       y2: (HEIGHT - 20) as f32
     }, canvas.clone());
   
+  let processing_thread_handle = thread::spawn(processing_thread::main);
   'main_loop: loop {
+    let old_count = writing_canvas.get_update_count();
+    
     clear_button.reset();
     for event in event_pump.poll_iter() {
       match event {
@@ -115,10 +136,36 @@ fn main() -> Result<(), ()> {
     writing_canvas.draw();
     clear_button.draw();
     
+    if writing_canvas.get_update_count() > old_count {
+      if let Ok(mut current_pixels) = CURRENT_PIXELS.try_lock() {
+        writing_canvas.with_pixels(|bytes, width, height, pitch, pixel_format| {
+          let mut data = Vec::new();
+          data.extend_from_slice(bytes);
+          current_pixels.0 = Some(
+            Arc::new(PixelBuffer::new(
+              data,
+              usize::try_from(pitch).unwrap(),
+              usize::try_from(width).unwrap(),
+              usize::try_from(height).unwrap(),
+              pixel_format
+            ))
+          );
+        });
+        
+        current_pixels.1 = writing_canvas.get_update_count();
+        
+        processing_thread_handle.thread().unpark();
+        CURRENT_PIXELS_COND.notify_all();
+      }
+    }
+    
     canvas.borrow_mut().present();
     timer.wait_tick(1);
   }
   
+  processing_thread::DO_SHUTDOWN.store(true, Ordering::Relaxed);
+  processing_thread_handle.thread().unpark();
+  processing_thread_handle.join().unwrap();
   Ok(())
 }
 

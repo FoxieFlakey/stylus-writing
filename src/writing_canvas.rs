@@ -33,6 +33,13 @@ impl WritingCanvas {
       .read_pixels(Some(self.bound.clone().into()))
       .unwrap();
     
+    // TODO: Handle format conversion off main thread??
+    //
+    // currently there one copy (from render target to surface)
+    // second copy (from surface to surface converting pixel format) <- should be on other thread
+    // third copy (from surface to raw Vec)
+    let surface = surface.convert_format(PixelFormat::RGB24).unwrap();
+    
     let width = surface.width();
     let height = surface.height();
     let pitch = surface.pitch();
