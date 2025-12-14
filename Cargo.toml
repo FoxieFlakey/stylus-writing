@@ -1,0 +1,10 @@
+[package]
+name = "stylus-writing"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+leptess = "0.14.0"
+log = "0.4.29"
+sdl3 = "0.16.2"
+simple-logging = "2.0.2"
