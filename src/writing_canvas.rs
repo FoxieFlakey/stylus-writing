@@ -98,6 +98,10 @@ impl WritingCanvas {
     }
   }
   
+  pub fn clear(&mut self) {
+    self.all_strokes.clear();
+  }
+  
   pub fn draw(&self) {
     let mut canvas = self.canvas.borrow_mut();
     canvas.set_draw_color(Color::RGB(0x88, 0x88, 0x88));
