@@ -3,7 +3,7 @@ use std::{sync::atomic::{AtomicBool, Ordering}, thread};
 use image::{ImageBuffer, Rgb};
 use sdl3::pixels::PixelFormat;
 
-use crate::processor::{Processor, leptess::LepTessProcessor};
+use crate::processor::{Processor, leptess::LepTessProcessor, paddle_ocr::PaddleOcrProcessor};
 
 pub static DO_SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
@@ -11,7 +11,7 @@ pub fn main() {
   log::info!("Processing thread started");
   
   let mut latest_update_id = 0;
-  let mut processor = LepTessProcessor::new();
+  let mut processor = PaddleOcrProcessor::new();
   
   while DO_SHUTDOWN.load(Ordering::Relaxed) == false {
     thread::park();
