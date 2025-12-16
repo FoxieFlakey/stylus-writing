@@ -32,15 +32,23 @@ impl Processor for PaddleOcrProcessor {
     
     let result = self.oar.predict(&[rgb]).unwrap();
     
+    let mut string = String::new();
     result.iter().for_each(|result| {
       for text in &result.text_regions {
         if let (Some(text), Some(confidence)) = (&text.text, &text.confidence) {
-          println!("Confidence: {confidence} Text: {text}");
+          if *confidence < 0.70 {
+            println!("AI not confidence enough not adding '{text}' (confidence: {confidence} < 70.0)");
+          } else {
+            if !string.is_empty() {
+              string.push(' ');
+            }
+            string.push_str(text.trim());
+          }
         }
       }
     });
     
-    "anc".into()
+    string
   }
 }
 

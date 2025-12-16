@@ -22,7 +22,7 @@ impl WritingCanvas {
       canvas,
       update_count: 0,
       current_pen: None,
-      stroke_distance_threshold: 3.0,
+      stroke_distance_threshold: 2.0,
       all_strokes: Vec::new()
     }
   }
