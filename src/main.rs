@@ -13,6 +13,7 @@ mod global;
 mod sdl_log;
 mod writing_canvas;
 mod processing_thread;
+mod processor;
 mod button;
 mod pixel_buffer;
 

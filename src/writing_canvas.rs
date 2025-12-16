@@ -22,7 +22,7 @@ impl WritingCanvas {
       canvas,
       update_count: 0,
       current_pen: None,
-      stroke_distance_threshold: 10.0,
+      stroke_distance_threshold: 3.0,
       all_strokes: Vec::new()
     }
   }
@@ -143,8 +143,22 @@ impl WritingCanvas {
     
     canvas.set_draw_color(Color::BLACK);
     for stroke in self.all_strokes.iter() {
-      let _ = canvas.draw_line(stroke.start.clone(), stroke.end.clone())
-        .map_err(|e| log::warn!("error calling canvas.draw_line: {e}"));
+      [
+        (stroke.start.clone(), stroke.end.clone()),
+        (Point { x: stroke.start.x + 1.0, y: stroke.start.y       }, Point { x: stroke.end.x + 1.0, y: stroke.end.y       }),
+        (Point { x: stroke.start.x + 1.0, y: stroke.start.y + 1.0 }, Point { x: stroke.end.x + 1.0, y: stroke.end.y + 1.0 }),
+        (Point { x: stroke.start.x      , y: stroke.start.y + 1.0 }, Point { x: stroke.end.x      , y: stroke.end.y + 1.0 }),
+        (Point { x: stroke.start.x - 1.0, y: stroke.start.y       }, Point { x: stroke.end.x - 1.0, y: stroke.end.y       }),
+        (Point { x: stroke.start.x - 1.0, y: stroke.start.y - 1.0 }, Point { x: stroke.end.x - 1.0, y: stroke.end.y - 1.0 }),
+        (Point { x: stroke.start.x      , y: stroke.start.y - 1.0 }, Point { x: stroke.end.x      , y: stroke.end.y - 1.0 }),
+        
+        (Point { x: stroke.start.x + 1.0, y: stroke.start.y - 1.0 }, Point { x: stroke.end.x + 1.0, y: stroke.end.y - 1.0 }),
+        (Point { x: stroke.start.x - 1.0, y: stroke.start.y + 1.0 }, Point { x: stroke.end.x - 1.0, y: stroke.end.y + 1.0 }),
+      ].into_iter()
+        .for_each(|(start, end)| {
+          let _ = canvas.draw_line(start, end)
+            .map_err(|e| log::warn!("error calling canvas.draw_line: {e}"));
+        });
     }
   }
 }
