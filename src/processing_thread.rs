@@ -1,6 +1,6 @@
-use std::{fs::File, sync::{Mutex, atomic::{AtomicBool, Ordering}}, thread};
+use std::{sync::{Mutex, atomic::{AtomicBool, Ordering}}, thread};
 
-use image::{ImageBuffer, Rgb, codecs::png::PngEncoder};
+use image::{ImageBuffer, Rgb};
 use sdl3::pixels::PixelFormat;
 
 use crate::processor::{Processor, paddle_ocr::PaddleOcrProcessor};
