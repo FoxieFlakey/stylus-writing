@@ -50,10 +50,6 @@ impl WritingCanvas {
     })
   }
   
-  pub fn get_stroke_count(&self) -> usize {
-    self.all_strokes.len()
-  } 
-  
   pub fn get_update_count(&self) -> u64 {
     self.update_count
   }

@@ -9,6 +9,7 @@ pub struct LepTessProcessor {
 }
 
 impl LepTessProcessor {
+  #[expect(unused)]
   pub fn new() -> Self {
     let mut result = Self {
       api: LepTess::new(Some("./tessdata"), "eng").unwrap(),

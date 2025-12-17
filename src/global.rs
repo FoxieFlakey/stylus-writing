@@ -18,12 +18,3 @@ pub fn get_video() -> sdl3::VideoSubsystem {
   }).expect("SDL not initialized or called from wrong thread")
 }
 
-pub fn is_main_thread() -> bool {
-  SDL.with(|x| x.borrow().is_some())
-}
-
-pub fn get_events() -> sdl3::EventSubsystem {
-  EVENTS.with(|x| {
-    x.borrow().clone()
-  }).expect("SDL not initialized or called from wrong thread")
-}

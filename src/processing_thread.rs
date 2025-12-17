@@ -3,7 +3,7 @@ use std::{sync::atomic::{AtomicBool, Ordering}, thread};
 use image::{ImageBuffer, Rgb};
 use sdl3::pixels::PixelFormat;
 
-use crate::processor::{Processor, leptess::LepTessProcessor, paddle_ocr::PaddleOcrProcessor};
+use crate::processor::{Processor, paddle_ocr::PaddleOcrProcessor};
 
 pub static DO_SHUTDOWN: AtomicBool = AtomicBool::new(false);
 
