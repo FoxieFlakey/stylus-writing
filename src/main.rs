@@ -1,11 +1,11 @@
 #![feature(thread_sleep_until)]
 
-use std::{cell::RefCell, io::stdout, rc::Rc, sync::{Arc, Condvar, Mutex, atomic::Ordering}, thread, time::Duration};
+use std::{io::stdout, sync::{Arc, Condvar, Mutex, atomic::Ordering}, thread, time::Duration};
 
 use log::LevelFilter;
 use sdl3::{event::Event, keyboard::Keycode, pixels::Color};
 
-use crate::{button::Button, pixel_buffer::PixelBuffer, shapes::Rect, timer::Timer, writing_canvas::WritingCanvas};
+use crate::{button::Button, pixel_buffer::PixelBuffer, shapes::Rect, timer::Timer, window::Window, writing_canvas::WritingCanvas};
 
 mod timer;
 mod shapes;
@@ -15,6 +15,7 @@ mod writing_canvas;
 mod processing_thread;
 mod processor;
 mod button;
+mod window;
 mod pixel_buffer;
 
 fn init_sdl() -> Result<(), ()> {
@@ -71,11 +72,16 @@ fn main() -> Result<(), ()> {
       log::error!("Error creating SDL event pump: {e}");
     })?;
   
-  const WIDTH: u32 = 800;
-  const HEIGHT: u32 = 300;
-  
-  let canvas = global::get_video()
-    .window_and_renderer("Writer", WIDTH, HEIGHT)
+  let window = Window::new(
+      "Writer",
+      800,
+      300,
+      400,
+      200,
+      0,
+      0,
+      false
+    )
     .map_err(|e| {
       log::error!("Error creating new window: {e}");
     })?;
@@ -83,22 +89,21 @@ fn main() -> Result<(), ()> {
   log::info!("Everything is initialized");
   println!("Hello, world!");
   
-  let canvas = Rc::new(RefCell::new(canvas));
   let mut timer = Timer::new(Duration::from_millis(1000 / 60));
   
   let mut clear_button = Button::new(Rect {
-    x1: (WIDTH - 100) as f32,
+    x1: (window.get_width() - 100) as f32,
     y1: 20.0,
-    x2: (WIDTH - 20) as f32,
+    x2: (window.get_width() - 20) as f32,
     y2: 80.0
-  }, canvas.clone());
+  }, window.get_canvas().clone());
   
   let mut writing_canvas = WritingCanvas::new(Rect {
       x1: 20.0,
       y1: 20.0, 
-      x2: (WIDTH - 120) as f32,
-      y2: (HEIGHT - 20) as f32
-    }, canvas.clone());
+      x2: (window.get_width() - 120) as f32,
+      y2: (window.get_height() - 20) as f32
+    }, window.get_canvas().clone());
   
   let processing_thread_handle = thread::spawn(processing_thread::main);
   'main_loop: loop {
@@ -129,7 +134,7 @@ fn main() -> Result<(), ()> {
       writing_canvas.clear();
     }
     
-    let mut canvas_borrow = canvas.borrow_mut();
+    let mut canvas_borrow = window.get_canvas().borrow_mut();
     canvas_borrow.set_draw_color(Color::RGB(0x55, 0x55, 0x55));
     canvas_borrow.clear();
     drop(canvas_borrow);
@@ -160,7 +165,7 @@ fn main() -> Result<(), ()> {
       }
     }
     
-    canvas.borrow_mut().present();
+    window.get_canvas().borrow_mut().present();
     timer.wait_tick(1);
   }
   
