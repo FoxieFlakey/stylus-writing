@@ -3,7 +3,7 @@
 use std::{io::stdout, sync::{Arc, Condvar, Mutex, atomic::Ordering}, thread, time::Duration};
 
 use log::LevelFilter;
-use sdl3::{event::Event, keyboard::Keycode, pixels::Color};
+use sdl3::{event::{Event, WindowEvent}, keyboard::Keycode, pixels::Color};
 
 use crate::{button::Button, pixel_buffer::PixelBuffer, shapes::Rect, timer::Timer, window::Window, writing_canvas::WritingCanvas};
 
@@ -80,7 +80,7 @@ fn main() -> Result<(), ()> {
       200,
       0,
       0,
-      false
+      true
     )
     .map_err(|e| {
       log::error!("Error creating new window: {e}");
@@ -90,19 +90,20 @@ fn main() -> Result<(), ()> {
   println!("Hello, world!");
   
   let mut timer = Timer::new(Duration::from_millis(1000 / 60));
+  window.set_canvas_size(800, 300);
   
   let mut clear_button = Button::new(Rect {
-    x1: (window.get_width() - 100) as f32,
+    x1: (window.get_canvas_width() - 100) as f32,
     y1: 20.0,
-    x2: (window.get_width() - 20) as f32,
+    x2: (window.get_canvas_width() - 20) as f32,
     y2: 80.0
   }, window.get_canvas().clone());
   
   let mut writing_canvas = WritingCanvas::new(Rect {
       x1: 20.0,
       y1: 20.0, 
-      x2: (window.get_width() - 120) as f32,
-      y2: (window.get_height() - 20) as f32
+      x2: (window.get_canvas_width() - 120) as f32,
+      y2: (window.get_canvas_height() - 20) as f32
     }, window.get_canvas().clone());
   
   let processing_thread_handle = thread::spawn(processing_thread::main);
@@ -125,6 +126,15 @@ fn main() -> Result<(), ()> {
         }
         Event::KeyDown { keycode: Some(Keycode::Escape), .. } => break 'main_loop,
         Event::Quit { .. } => break 'main_loop,
+        Event::Window { window_id, win_event: WindowEvent::Resized(_, _), .. } => {
+          if window_id != window.get_window_id() {
+            log::warn!("Unknown window events for unknown window?!");
+            continue;
+          }
+          
+          let (width, height) = (window.get_width(), window.get_height());
+          println!("Resized to: {}x{}", width, height);
+        }
         _ => ()
       }
     }

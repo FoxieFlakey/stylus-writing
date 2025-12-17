@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use sdl3::{render::Canvas, video::{Window as SDLWindow, WindowBuildError}};
+use sdl3::{render::Canvas, sys::render::SDL_RendererLogicalPresentation, video::{Window as SDLWindow, WindowBuildError}};
 
 use crate::global;
 
@@ -42,8 +42,26 @@ impl Window {
     })
   }
   
+  pub fn set_canvas_size(&self, width: u32, height: u32) {
+    self.canvas.borrow_mut()
+      .set_logical_size(width, height, SDL_RendererLogicalPresentation::OVERSCAN)
+      .unwrap();
+  }
+  
+  pub fn get_window_id(&self) -> u32 {
+    self.window.id()
+  }
+  
   pub fn get_canvas(&self) -> &Rc<RefCell<Canvas<SDLWindow>>> {
     &self.canvas
+  }
+  
+  pub fn get_canvas_width(&self) -> u32 {
+    self.canvas.borrow().logical_size().0
+  }
+  
+  pub fn get_canvas_height(&self) -> u32 {
+    self.canvas.borrow().logical_size().1
   }
   
   pub fn get_width(&self) -> u32 {
