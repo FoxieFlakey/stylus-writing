@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use sdl3::{render::Canvas, sys::render::SDL_RendererLogicalPresentation, video::{Window as SDLWindow, WindowBuildError}};
+use sdl3::{render::Canvas, sys::render::SDL_RendererLogicalPresentation, video::{Window as SDLWindow, WindowBuildError, WindowFlags}};
 
 use crate::global;
 
@@ -25,6 +25,8 @@ impl Window {
     if can_resize {
       window.resizable();
     }
+    let flags = window.flags();
+    window.set_flags(flags | WindowFlags::ALWAYS_ON_TOP);
     let mut window = window.build()?;
     
     let canvas = Rc::new(RefCell::new(window.clone().into_canvas()));

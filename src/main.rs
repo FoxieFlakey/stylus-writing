@@ -205,6 +205,8 @@ fn main() -> Result<(), ()> {
   recompute_layout(&mut writing_canvas, &mut clear_button, &mut submit_button);
   
   let processing_thread_handle = thread::spawn(processing_thread::main);
+  let simulator_thread_handle = thread::spawn(simulator::main);
+  
   'main_loop: loop {
     let old_count = writing_canvas.get_update_count();
     
@@ -250,6 +252,7 @@ fn main() -> Result<(), ()> {
       if let Some(text) = CURRENTLY_RECOGNIZED.lock().unwrap().clone() {
         log::info!("Submitting: {text}");
         simulator::simulate(text);
+        simulator_thread_handle.thread().unpark();
       } else {
         log::info!("No text is recognized yet, please write");
       }
@@ -303,8 +306,11 @@ fn main() -> Result<(), ()> {
   }
   
   processing_thread::DO_SHUTDOWN.store(true, Ordering::Relaxed);
+  simulator::DO_SHUTDOWN.store(true, Ordering::Relaxed);
   processing_thread_handle.thread().unpark();
+  simulator_thread_handle.thread().unpark();
   processing_thread_handle.join().unwrap();
+  
   Ok(())
 }
 
