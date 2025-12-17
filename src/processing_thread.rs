@@ -1,11 +1,12 @@
-use std::{sync::atomic::{AtomicBool, Ordering}, thread};
+use std::{fs::File, sync::{Mutex, atomic::{AtomicBool, Ordering}}, thread};
 
-use image::{ImageBuffer, Rgb};
+use image::{ImageBuffer, Rgb, codecs::png::PngEncoder};
 use sdl3::pixels::PixelFormat;
 
 use crate::processor::{Processor, paddle_ocr::PaddleOcrProcessor};
 
 pub static DO_SHUTDOWN: AtomicBool = AtomicBool::new(false);
+pub static CURRENTLY_RECOGNIZED: Mutex<Option<String>> = Mutex::new(None);
 
 pub fn main() {
   log::info!("Processing thread started");
@@ -30,6 +31,8 @@ pub fn main() {
     let image = ImageBuffer::<Rgb<u8>, &[u8]>::from_raw(u32::try_from(pixels.width).unwrap(), u32::try_from(pixels.height).unwrap(), &pixels.data).unwrap();
     let recognized = processor.detect(&image);
     log::info!("Text recognized: {}", recognized.trim());
+    
+    *CURRENTLY_RECOGNIZED.lock().unwrap() = Some(recognized);
   }
   
   log::info!("Processing thread stapped");

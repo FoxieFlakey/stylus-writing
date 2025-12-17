@@ -3,10 +3,10 @@
 use std::{io::stdout, sync::{Arc, Condvar, Mutex, atomic::Ordering}, thread, time::Duration};
 
 use log::LevelFilter;
-use sdl3::{event::{Event, WindowEvent}, keyboard::Keycode, pixels::Color};
+use sdl3::{event::{Event, WindowEvent}, keyboard::Keycode, pixels::{Color, PixelFormat}};
 use taffy::{AvailableSpace, FlexDirection, FlexWrap, Size, Style, TaffyTree, prelude::FromLength};
 
-use crate::{button::Button, pixel_buffer::PixelBuffer, shapes::Rect, timer::Timer, window::Window, writing_canvas::WritingCanvas};
+use crate::{button::Button, pixel_buffer::PixelBuffer, processing_thread::CURRENTLY_RECOGNIZED, shapes::Rect, timer::Timer, window::Window, writing_canvas::WritingCanvas};
 
 mod timer;
 mod shapes;
@@ -16,6 +16,7 @@ mod writing_canvas;
 mod processing_thread;
 mod processor;
 mod button;
+mod simulator;
 mod window;
 mod pixel_buffer;
 
@@ -100,6 +101,13 @@ fn main() -> Result<(), ()> {
     y2: 80.0
   }, window.get_canvas().clone());
   
+  let mut submit_button = Button::new(Rect {
+    x1: (window.get_canvas_width() - 100) as f32,
+    y1: 20.0,
+    x2: (window.get_canvas_width() - 20) as f32,
+    y2: 80.0
+  }, window.get_canvas().clone());
+  
   let mut tree = TaffyTree::<()>::new();
   let writing_canvas_layout = tree.new_leaf(Style {
       min_size: Size::from_lengths(100.0, 100.0),
@@ -112,6 +120,11 @@ fn main() -> Result<(), ()> {
       ..Default::default()
     }).unwrap();
   
+  let submit_button_layout = tree.new_leaf(Style {
+      size: Size::from_lengths(100.0, 60.0),
+      ..Default::default()
+    }).unwrap();
+  
   let buttons_layout = tree.new_with_children(
     Style {
       gap: Size::from_length(10.0),
@@ -119,7 +132,10 @@ fn main() -> Result<(), ()> {
       flex_wrap: FlexWrap::Wrap,
       ..Default::default()
     },
-    &[clear_button_layout]
+    &[
+      clear_button_layout,
+      submit_button_layout
+    ]
   ).unwrap();
   
   let root = tree.new_with_children(
@@ -144,7 +160,7 @@ fn main() -> Result<(), ()> {
       y2: (window.get_canvas_height() - 20) as f32
     }, window.get_canvas().clone());
   
-  let mut recompute_layout = |writing_canvas: &mut WritingCanvas, clear_button: &mut Button| -> () {
+  let mut recompute_layout = |writing_canvas: &mut WritingCanvas, clear_button: &mut Button, submit_button: &mut Button| -> () {
     tree.compute_layout(
       root,
       Size {
@@ -176,24 +192,36 @@ fn main() -> Result<(), ()> {
       x2: parent_x + new_layout.content_box_x() + new_layout.content_box_width(),
       y2: parent_y + new_layout.content_box_y() + new_layout.content_box_height()
     });
+    
+    let new_layout = tree.layout(submit_button_layout).unwrap();
+    submit_button.set_bound(Rect {
+      x1: parent_x + new_layout.content_box_x(),
+      y1: parent_y + new_layout.content_box_y(),
+      x2: parent_x + new_layout.content_box_x() + new_layout.content_box_width(),
+      y2: parent_y + new_layout.content_box_y() + new_layout.content_box_height()
+    });
   };
   
-  recompute_layout(&mut writing_canvas, &mut clear_button);
+  recompute_layout(&mut writing_canvas, &mut clear_button, &mut submit_button);
   
   let processing_thread_handle = thread::spawn(processing_thread::main);
   'main_loop: loop {
     let old_count = writing_canvas.get_update_count();
     
     clear_button.reset();
+    submit_button.reset();
+    
     for event in event_pump.poll_iter() {
       match event {
         Event::PenDown { x, y, which, .. } => {
           writing_canvas.pen_down(x, y, which);
           clear_button.pen_down(x, y);
+          submit_button.pen_down(x, y);
         }
         Event::PenUp { x, y, which, .. } => {
           writing_canvas.pen_up(x, y, which);
           clear_button.pen_up(x, y);
+          submit_button.pen_up(x, y);
         }
         Event::PenMotion { x, y, which, .. } => {
           writing_canvas.pen_motion(x, y, which);
@@ -206,7 +234,7 @@ fn main() -> Result<(), ()> {
             continue;
           }
           
-          recompute_layout(&mut writing_canvas, &mut clear_button);
+          recompute_layout(&mut writing_canvas, &mut clear_button, &mut submit_button);
         }
         _ => ()
       }
@@ -215,6 +243,16 @@ fn main() -> Result<(), ()> {
     if clear_button.is_pressed() {
       log::info!("Clearing writing canvas");
       writing_canvas.clear();
+      *CURRENTLY_RECOGNIZED.lock().unwrap() = None;
+    }
+    
+    if submit_button.is_pressed() {
+      if let Some(text) = CURRENTLY_RECOGNIZED.lock().unwrap().clone() {
+        log::info!("Submitting: {text}");
+        simulator::simulate(text);
+      } else {
+        log::info!("No text is recognized yet, please write");
+      }
     }
     
     let mut canvas_borrow = window.get_canvas().borrow_mut();
@@ -224,6 +262,7 @@ fn main() -> Result<(), ()> {
     
     writing_canvas.draw();
     clear_button.draw();
+    submit_button.draw();
     
     if writing_canvas.get_update_count() > old_count {
       if let Ok(mut current_pixels) = CURRENT_PIXELS.try_lock() {
@@ -236,8 +275,8 @@ fn main() -> Result<(), ()> {
           let mut data = Vec::new();
           // Now i need to fuckin repack the pixels as SDL3 might add padding at the end
           for i in 0..height {
-            let current_line = &bytes[(i * pitch * 3)..((i * pitch + width) * 3)];
-            assert!(current_line.len() == width);
+            let current_line = &bytes[(i * pitch)..(i * pitch + width * 3)];
+            assert!(current_line.len() == width * 3);
             data.extend_from_slice(current_line);
           }
           assert!(data.len() == width * height * 3);
