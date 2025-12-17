@@ -4,7 +4,7 @@ use std::{io::stdout, sync::{Arc, Condvar, Mutex, atomic::Ordering}, thread, tim
 
 use log::LevelFilter;
 use sdl3::{event::{Event, WindowEvent}, keyboard::Keycode, pixels::Color};
-use taffy::{FlexDirection, FlexWrap, Size, Style, TaffyTree, prelude::{FromLength, TaffyMaxContent}};
+use taffy::{AvailableSpace, FlexDirection, FlexWrap, Size, Style, TaffyTree, prelude::FromLength};
 
 use crate::{button::Button, pixel_buffer::PixelBuffer, shapes::Rect, timer::Timer, window::Window, writing_canvas::WritingCanvas};
 
@@ -18,7 +18,6 @@ mod processor;
 mod button;
 mod window;
 mod pixel_buffer;
-mod ui;
 
 fn init_sdl() -> Result<(), ()> {
   global::SDL.set(Some(
@@ -102,53 +101,41 @@ fn main() -> Result<(), ()> {
   }, window.get_canvas().clone());
   
   let mut tree = TaffyTree::<()>::new();
-  let writing_canvas = tree.new_leaf(Style {
+  let writing_canvas_layout = tree.new_leaf(Style {
       min_size: Size::from_lengths(100.0, 100.0),
-      size: Size::from_percent(100.0, 100.0),
+      flex_grow: 1.0,
       ..Default::default()
     }).unwrap();
-  let buttons = [
-    // Clear button
-    tree.new_leaf(Style {
+  
+  let clear_button_layout = tree.new_leaf(Style {
       size: Size::from_lengths(100.0, 60.0),
       ..Default::default()
-    }).unwrap(),
-    
-    // Delete word button
-    tree.new_leaf(Style {
-      size: Size::from_lengths(100.0, 60.0),
-      ..Default::default()
-    }).unwrap()
-  ];
-  let buttons = tree.new_with_children(
+    }).unwrap();
+  
+  let buttons_layout = tree.new_with_children(
     Style {
       gap: Size::from_length(10.0),
       flex_direction: FlexDirection::Column,
       flex_wrap: FlexWrap::Wrap,
       ..Default::default()
     },
-    &buttons
+    &[clear_button_layout]
   ).unwrap();
   
   let root = tree.new_with_children(
     Style {
+      padding: taffy::Rect::length(10.0),
       gap: Size::from_length(10.0),
+      size: Size::from_percent(1.0, 1.0),
       flex_direction: FlexDirection::Row,
       flex_wrap: FlexWrap::Wrap,
       ..Default::default()
     },
     &[
-      writing_canvas,
-      buttons
+      writing_canvas_layout,
+      buttons_layout
     ]
   ).unwrap();
-  
-  tree.compute_layout(root, Size::MAX_CONTENT).unwrap();
-  tree.print_tree(root);
-  
-  println!("-----------------------------------");
-  
-  let root_layout = tree.layout(root).unwrap();
   
   let mut writing_canvas = WritingCanvas::new(Rect {
       x1: 20.0,
@@ -156,6 +143,42 @@ fn main() -> Result<(), ()> {
       x2: (window.get_canvas_width() - 120) as f32,
       y2: (window.get_canvas_height() - 20) as f32
     }, window.get_canvas().clone());
+  
+  let mut recompute_layout = |writing_canvas: &mut WritingCanvas, clear_button: &mut Button| -> () {
+    tree.compute_layout(
+      root,
+      Size {
+        width: AvailableSpace::Definite(window.get_width() as f32),
+        height: AvailableSpace::Definite(window.get_height() as f32)
+      }
+    ).unwrap();
+    
+    window.set_canvas_size(window.get_width(), window.get_height());
+    
+    let root = tree.layout(root).unwrap();
+    let root_x = root.location.x;
+    let root_y = root.location.y;
+    let new_layout = tree.layout(writing_canvas_layout).unwrap();
+    writing_canvas.set_bound(Rect {
+      x1: root_x + new_layout.content_box_x(),
+      y1: root_y + new_layout.content_box_y(),
+      x2: root_x + new_layout.content_box_x() + new_layout.content_box_width(),
+      y2: root_y + new_layout.content_box_y() + new_layout.content_box_height()
+    });
+    
+    let new_layout = tree.layout(clear_button_layout).unwrap();
+    let parent = tree.layout(buttons_layout).unwrap();
+    let parent_x = root_x + parent.location.x;
+    let parent_y = root_y + parent.location.y;
+    clear_button.set_bound(Rect {
+      x1: parent_x + new_layout.content_box_x(),
+      y1: parent_y + new_layout.content_box_y(),
+      x2: parent_x + new_layout.content_box_x() + new_layout.content_box_width(),
+      y2: parent_y + new_layout.content_box_y() + new_layout.content_box_height()
+    });
+  };
+  
+  recompute_layout(&mut writing_canvas, &mut clear_button);
   
   let processing_thread_handle = thread::spawn(processing_thread::main);
   'main_loop: loop {
@@ -165,15 +188,15 @@ fn main() -> Result<(), ()> {
     for event in event_pump.poll_iter() {
       match event {
         Event::PenDown { x, y, which, .. } => {
-          // writing_canvas.pen_down(x, y, which);
-          // clear_button.pen_down(x, y);
+          writing_canvas.pen_down(x, y, which);
+          clear_button.pen_down(x, y);
         }
         Event::PenUp { x, y, which, .. } => {
-          // writing_canvas.pen_up(x, y, which);
-          // clear_button.pen_up(x, y);
+          writing_canvas.pen_up(x, y, which);
+          clear_button.pen_up(x, y);
         }
         Event::PenMotion { x, y, which, .. } => {
-          // writing_canvas.pen_motion(x, y, which);
+          writing_canvas.pen_motion(x, y, which);
         }
         Event::KeyDown { keycode: Some(Keycode::Escape), .. } => break 'main_loop,
         Event::Quit { .. } => break 'main_loop,
@@ -183,8 +206,7 @@ fn main() -> Result<(), ()> {
             continue;
           }
           
-          let (width, height) = (window.get_width(), window.get_height());
-          println!("Resized to: {}x{}", width, height);
+          recompute_layout(&mut writing_canvas, &mut clear_button);
         }
         _ => ()
       }
@@ -200,8 +222,8 @@ fn main() -> Result<(), ()> {
     canvas_borrow.clear();
     drop(canvas_borrow);
     
-    // writing_canvas.draw();
-    // clear_button.draw();
+    writing_canvas.draw();
+    clear_button.draw();
     
     if writing_canvas.get_update_count() > old_count {
       if let Ok(mut current_pixels) = CURRENT_PIXELS.try_lock() {

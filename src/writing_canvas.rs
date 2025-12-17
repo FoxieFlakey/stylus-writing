@@ -90,6 +90,10 @@ impl WritingCanvas {
     self.update_count += 1;
   }
   
+  pub fn set_bound(&mut self, rect: Rect) {
+    self.bound = rect;
+  }
+  
   pub fn pen_motion(&mut self, x: f32, y: f32, pen: u32) {
     let Some(current_pen) = self.current_pen.as_mut() else {
       return;
@@ -128,6 +132,7 @@ impl WritingCanvas {
   }
   
   pub fn clear(&mut self) {
+    self.current_pen = None;
     self.all_strokes.clear();
   }
   
@@ -152,6 +157,10 @@ impl WritingCanvas {
         (Point { x: stroke.start.x - 1.0, y: stroke.start.y + 1.0 }, Point { x: stroke.end.x - 1.0, y: stroke.end.y + 1.0 }),
       ].into_iter()
         .for_each(|(start, end)| {
+          if !self.bound.contains(&start) || !self.bound.contains(&end) {
+            return;
+          }
+          
           let _ = canvas.draw_line(start, end)
             .map_err(|e| log::warn!("error calling canvas.draw_line: {e}"));
         });

@@ -36,6 +36,10 @@ impl Button {
     self.is_pressed
   }
   
+  pub fn set_bound(&mut self, bound: Rect) {
+    self.bound = bound;
+  }
+  
   pub fn pen_up(&mut self, _x: f32, _y: f32) {
     if self.is_down {
       self.is_pressed = true;
