@@ -228,14 +228,25 @@ fn main() -> Result<(), ()> {
     if writing_canvas.get_update_count() > old_count {
       if let Ok(mut current_pixels) = CURRENT_PIXELS.try_lock() {
         writing_canvas.with_pixels(|bytes, width, height, pitch, pixel_format| {
+          let pitch = usize::try_from(pitch).unwrap();
+          let width = usize::try_from(width).unwrap();
+          let height = usize::try_from(height).unwrap();
+          assert!(pixel_format == PixelFormat::RGB24);
+          
           let mut data = Vec::new();
-          data.extend_from_slice(bytes);
+          // Now i need to fuckin repack the pixels as SDL3 might add padding at the end
+          for i in 0..height {
+            let current_line = &bytes[(i * pitch * 3)..((i * pitch + width) * 3)];
+            assert!(current_line.len() == width);
+            data.extend_from_slice(current_line);
+          }
+          assert!(data.len() == width * height * 3);
+          
           current_pixels.0 = Some(
             Arc::new(PixelBuffer::new(
               data,
-              usize::try_from(pitch).unwrap(),
-              usize::try_from(width).unwrap(),
-              usize::try_from(height).unwrap(),
+              width,
+              height,
               pixel_format
             ))
           );
