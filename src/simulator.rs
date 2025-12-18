@@ -1,12 +1,37 @@
-use std::{sync::{Mutex, atomic::{AtomicBool, Ordering}}, thread};
+use std::{sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}}, thread};
 
 use rdev::{EventType, Key};
+use x11rb::{connection::Connection, protocol::xproto::{ChangeWindowAttributesAux, ConnectionExt, EventMask}};
 
 pub static DO_SHUTDOWN: AtomicBool = AtomicBool::new(false);
 static SIMULATE: Mutex<Option<String>> = Mutex::new(None);
 
 pub fn main() {
   log::info!("Simulator started");
+  let (conn, screen_num) = x11rb::connect(None).unwrap();
+  let screen = &conn.setup().roots[screen_num];
+  let root_window = screen.root;
+  conn.change_window_attributes(
+    root_window,
+    &ChangeWindowAttributesAux::new()
+      .event_mask(EventMask::FOCUS_CHANGE)
+  ).unwrap();
+  conn.flush().unwrap();
+  
+  let prev_window = Arc::new(Mutex::new(None));
+  {
+    let prev2 = prev_window.clone();
+    thread::spawn(move || {
+      loop {
+        match conn.wait_for_event().unwrap() {
+          x11rb::protocol::Event::FocusOut(data) => {
+            *prev2.lock().unwrap() = Some(data.event);
+          },
+          _ => ()
+        }
+      }
+    });
+  }
   
   while DO_SHUTDOWN.load(Ordering::Relaxed) == false {
     thread::park();
@@ -15,6 +40,13 @@ pub fn main() {
     
     if let Some(text) = simulate_string {
       log::info!("Request to simulate: {text} received");
+      
+      rdev::simulate(&EventType::KeyPress(Key::Alt)).unwrap();
+      rdev::simulate(&EventType::KeyPress(Key::Tab)).unwrap();
+      sdl3::timer::delay(50);
+      rdev::simulate(&EventType::KeyRelease(Key::Tab)).unwrap();
+      rdev::simulate(&EventType::KeyRelease(Key::Alt)).unwrap();
+      
       for chr in text.chars() {
         let mut keys = match chr.to_ascii_uppercase() {
           'A' => [Some(Key::ShiftLeft), Some(Key::KeyA)],
@@ -54,7 +86,7 @@ pub fn main() {
           rdev::simulate(&EventType::KeyPress(*key)).unwrap();
         }
         
-        sdl3::timer::delay(2);
+        sdl3::timer::delay(5);
         
         for key in keys.iter().rev().flatten() {
           rdev::simulate(&EventType::KeyRelease(*key)).unwrap();
