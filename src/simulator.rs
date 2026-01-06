@@ -76,6 +76,17 @@ pub fn main() {
           
           for chr in text.chars() {
             let mut keys = match chr.to_ascii_uppercase() {
+              ' ' => [None, Some(Key::Space)],
+              '0' => [None, Some(Key::Num0)],
+              '1' => [None, Some(Key::Num1)],
+              '2' => [None, Some(Key::Num2)],
+              '3' => [None, Some(Key::Num3)],
+              '4' => [None, Some(Key::Num4)],
+              '5' => [None, Some(Key::Num5)],
+              '6' => [None, Some(Key::Num6)],
+              '7' => [None, Some(Key::Num7)],
+              '8' => [None, Some(Key::Num8)],
+              '9' => [None, Some(Key::Num9)],
               'A' => [Some(Key::ShiftLeft), Some(Key::KeyA)],
               'B' => [Some(Key::ShiftLeft), Some(Key::KeyB)],
               'C' => [Some(Key::ShiftLeft), Some(Key::KeyC)],
@@ -105,7 +116,7 @@ pub fn main() {
               _ => continue
             };
             
-            if chr.is_ascii_lowercase() {
+            if chr.is_ascii_lowercase() && chr.is_ascii_alphabetic() {
               keys[0] = None;
             }
             
