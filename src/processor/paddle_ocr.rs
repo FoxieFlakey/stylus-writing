@@ -15,6 +15,7 @@ impl PaddleOcrProcessor {
           "./paddle-paddle/rec.onnx".into(),
           "./paddle-paddle/dict.txt".into()
         )
+        .with_high_performance()
         .textline_orientation_classify_model_name("./paddle-paddle/textline.onnx".into())
         .doc_orientation_classify_model_name("./paddle-paddle/orientation.onnx".into())
         .doc_unwarping_model_name("./paddle-paddle/unwarping.onnx".into())
