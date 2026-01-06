@@ -325,6 +325,7 @@ fn main() -> Result<(), ()> {
         log::info!("Submitting: {text}");
         simulator::simulate(text);
         simulator_thread_handle.thread().unpark();
+        writing_canvas.clear();
       } else {
         log::info!("No text is recognized yet, please write");
       }
