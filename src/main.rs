@@ -108,6 +108,27 @@ fn main() -> Result<(), ()> {
     y2: 80.0
   }, window.get_canvas().clone());
   
+  let mut enter_button = Button::new(Rect {
+    x1: (window.get_canvas_width() - 100) as f32,
+    y1: 20.0,
+    x2: (window.get_canvas_width() - 20) as f32,
+    y2: 80.0
+  }, window.get_canvas().clone());
+  
+  let mut space_button = Button::new(Rect {
+    x1: (window.get_canvas_width() - 100) as f32,
+    y1: 20.0,
+    x2: (window.get_canvas_width() - 20) as f32,
+    y2: 80.0
+  }, window.get_canvas().clone());
+  
+  let mut delword_button = Button::new(Rect {
+    x1: (window.get_canvas_width() - 100) as f32,
+    y1: 20.0,
+    x2: (window.get_canvas_width() - 20) as f32,
+    y2: 80.0
+  }, window.get_canvas().clone());
+  
   let mut tree = TaffyTree::<()>::new();
   let writing_canvas_layout = tree.new_leaf(Style {
       min_size: Size::from_lengths(100.0, 100.0),
@@ -125,6 +146,21 @@ fn main() -> Result<(), ()> {
       ..Default::default()
     }).unwrap();
   
+  let enter_button_layout = tree.new_leaf(Style {
+      size: Size::from_lengths(100.0, 60.0),
+      ..Default::default()
+    }).unwrap();
+  
+  let space_button_layout = tree.new_leaf(Style {
+      size: Size::from_lengths(100.0, 60.0),
+      ..Default::default()
+    }).unwrap();
+  
+  let delword_button_layout = tree.new_leaf(Style {
+      size: Size::from_lengths(100.0, 60.0),
+      ..Default::default()
+    }).unwrap();
+  
   let buttons_layout = tree.new_with_children(
     Style {
       gap: Size::from_length(10.0),
@@ -134,7 +170,10 @@ fn main() -> Result<(), ()> {
     },
     &[
       clear_button_layout,
-      submit_button_layout
+      submit_button_layout,
+      enter_button_layout,
+      space_button_layout,
+      delword_button_layout
     ]
   ).unwrap();
   
@@ -160,7 +199,7 @@ fn main() -> Result<(), ()> {
       y2: (window.get_canvas_height() - 20) as f32
     }, window.get_canvas().clone());
   
-  let mut recompute_layout = |writing_canvas: &mut WritingCanvas, clear_button: &mut Button, submit_button: &mut Button| -> () {
+  let mut recompute_layout = |writing_canvas: &mut WritingCanvas, clear_button: &mut Button, submit_button: &mut Button, enter_button: &mut Button, delword_button: &mut Button, space_button: &mut Button| -> () {
     tree.compute_layout(
       root,
       Size {
@@ -200,9 +239,33 @@ fn main() -> Result<(), ()> {
       x2: parent_x + new_layout.content_box_x() + new_layout.content_box_width(),
       y2: parent_y + new_layout.content_box_y() + new_layout.content_box_height()
     });
+    
+    let new_layout = tree.layout(enter_button_layout).unwrap();
+    enter_button.set_bound(Rect {
+      x1: parent_x + new_layout.content_box_x(),
+      y1: parent_y + new_layout.content_box_y(),
+      x2: parent_x + new_layout.content_box_x() + new_layout.content_box_width(),
+      y2: parent_y + new_layout.content_box_y() + new_layout.content_box_height()
+    });
+    
+    let new_layout = tree.layout(delword_button_layout).unwrap();
+    delword_button.set_bound(Rect {
+      x1: parent_x + new_layout.content_box_x(),
+      y1: parent_y + new_layout.content_box_y(),
+      x2: parent_x + new_layout.content_box_x() + new_layout.content_box_width(),
+      y2: parent_y + new_layout.content_box_y() + new_layout.content_box_height()
+    });
+    
+    let new_layout = tree.layout(space_button_layout).unwrap();
+    space_button.set_bound(Rect {
+      x1: parent_x + new_layout.content_box_x(),
+      y1: parent_y + new_layout.content_box_y(),
+      x2: parent_x + new_layout.content_box_x() + new_layout.content_box_width(),
+      y2: parent_y + new_layout.content_box_y() + new_layout.content_box_height()
+    });
   };
   
-  recompute_layout(&mut writing_canvas, &mut clear_button, &mut submit_button);
+  recompute_layout(&mut writing_canvas, &mut clear_button, &mut submit_button, &mut enter_button, &mut delword_button, &mut space_button);
   
   let processing_thread_handle = thread::spawn(processing_thread::main);
   let simulator_thread_handle = thread::spawn(simulator::main);
@@ -212,6 +275,9 @@ fn main() -> Result<(), ()> {
     
     clear_button.reset();
     submit_button.reset();
+    enter_button.reset();
+    space_button.reset();
+    delword_button.reset();
     
     for event in event_pump.poll_iter() {
       match event {
@@ -219,11 +285,17 @@ fn main() -> Result<(), ()> {
           writing_canvas.pen_down(x, y, which);
           clear_button.pen_down(x, y);
           submit_button.pen_down(x, y);
+          enter_button.pen_down(x, y);
+          space_button.pen_down(x, y);
+          delword_button.pen_down(x, y);
         }
         Event::PenUp { x, y, which, .. } => {
           writing_canvas.pen_up(x, y, which);
           clear_button.pen_up(x, y);
           submit_button.pen_up(x, y);
+          enter_button.pen_up(x, y);
+          space_button.pen_up(x, y);
+          delword_button.pen_up(x, y);
         }
         Event::PenMotion { x, y, which, .. } => {
           writing_canvas.pen_motion(x, y, which);
@@ -236,7 +308,7 @@ fn main() -> Result<(), ()> {
             continue;
           }
           
-          recompute_layout(&mut writing_canvas, &mut clear_button, &mut submit_button);
+          recompute_layout(&mut writing_canvas, &mut clear_button, &mut submit_button, &mut enter_button, &mut delword_button, &mut space_button);
         }
         _ => ()
       }
@@ -258,6 +330,21 @@ fn main() -> Result<(), ()> {
       }
     }
     
+    if enter_button.is_pressed() {
+      simulator::simulate_enter();
+      simulator_thread_handle.thread().unpark();
+    }
+    
+    if delword_button.is_pressed() {
+      simulator::simulate_delword();
+      simulator_thread_handle.thread().unpark();
+    }
+    
+    if space_button.is_pressed() {
+      simulator::simulate_space();
+      simulator_thread_handle.thread().unpark();
+    }
+    
     let mut canvas_borrow = window.get_canvas().borrow_mut();
     canvas_borrow.set_draw_color(Color::RGB(0x55, 0x55, 0x55));
     canvas_borrow.clear();
@@ -266,6 +353,9 @@ fn main() -> Result<(), ()> {
     writing_canvas.draw();
     clear_button.draw();
     submit_button.draw();
+    enter_button.draw();
+    delword_button.draw();
+    space_button.draw();
     
     if writing_canvas.get_update_count() > old_count {
       if let Ok(mut current_pixels) = CURRENT_PIXELS.try_lock() {
